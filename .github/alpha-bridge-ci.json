@@ -1,0 +1,35 @@
+{
+  "definition_blob_sha1": {
+    ".github/workflows/alpha-bridge-ci-verify.yml": "0588ba302e7a97a9721ae7494f6b9aca053476b6",
+    ".github/workflows/dailies.yml": "374383730c1801ca3df296b6d5c248f75410d0a6",
+    ".github/workflows/dev-dailies.yml": "0ab56020fac308838e687688ae2759f3328932e2",
+    ".github/workflows/generic_aws_tests.yml": "a5261b8eb84a202fe0b3a5e3658d5c4e6c3393c6",
+    ".github/workflows/neuroconv_deployment_aws_tests.yml": "799804d6a3ce4de07743fa6887795c6e219f5440",
+    ".github/workflows/rclone_aws_tests.yml": "78249da916eff47d48b755732a6c85b7566e518f",
+    ".github/workflows/weeklies.yml": "392d1f56a8d1cfd27ba386c7ef11fbb40f2ed7ea"
+  },
+  "definition_sha256": {
+    ".github/workflows/alpha-bridge-ci-verify.yml": "d3dacd19a9c94cd86ca5ba24b075c35f3ff224d155ca5891f3b4325ece933dac",
+    ".github/workflows/dailies.yml": "0dfe778bc56db01056f7eba8eb45721ff79322298ef89759d348e8c567a67cd2",
+    ".github/workflows/dev-dailies.yml": "55e0e424f3d946cd4fe74dba298e0b7fd0bc0a41d173f13ff26b77672c177f25",
+    ".github/workflows/generic_aws_tests.yml": "b64b449bd75b8d753fe4fdf930591dc2f2aad63bebe173f08932c1a1d5507c6b",
+    ".github/workflows/neuroconv_deployment_aws_tests.yml": "60d79eac6ca87b33a817a2ebbc35847d7baa91e01000805c090626810bad99ab",
+    ".github/workflows/rclone_aws_tests.yml": "c2b5dca85da30510eefa17dd6797f3005a88178af867eac665335060d6045449",
+    ".github/workflows/weeklies.yml": "74eb0d39753ded5e5da0802a176455c6485ae0c9e9fa914420daee6885eed9b3"
+  },
+  "generator_sha256": "f238e5d52b0ec5c07f088af203f93698fbdea22a995856dc18c50f5365431353",
+  "schema": "alpha-bridge/fork-ci",
+  "source_branch": "main",
+  "source_commit": "7a89436952878d6e2e0b7322c429d2bc719f0ebc",
+  "source_repository": "catalystneuro/neuroconv",
+  "version": 1,
+  "workflows": [
+    ".github/workflows/alpha-bridge-ci-verify.yml",
+    ".github/workflows/dailies.yml",
+    ".github/workflows/dev-dailies.yml",
+    ".github/workflows/generic_aws_tests.yml",
+    ".github/workflows/neuroconv_deployment_aws_tests.yml",
+    ".github/workflows/rclone_aws_tests.yml",
+    ".github/workflows/weeklies.yml"
+  ]
+}
