@@ -29,7 +29,8 @@ jobs:
         ref: ${{ (github.event_name == 'schedule' || github.event_name == 
           'workflow_run') && '7a89436952878d6e2e0b7322c429d2bc719f0ebc' || 
           github.sha }}
-    - run: git fetch --prune --unshallow --tags
+    - run: |-
+        git fetch --prune --unshallow --tags
     - name: Setup Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
       with:
@@ -42,10 +43,13 @@ jobs:
         git config --global user.name "CI Almighty"
 
     - name: Install AWS requirements
-      run: pip install .[aws,test]
+      run: |-
+        pip install .[aws,test]
+
 
     - name: Run generic AWS tests
-      run: pytest -rsx -n auto tests/remote_transfer_services/aws_tools_tests.py
+      run: |-
+        pytest -rsx -n auto tests/remote_transfer_services/aws_tools_tests.py
     needs:
     - alpha_bridge_inputs
     if: ${{ (success()) && needs.alpha_bridge_inputs.outputs.changed == 'true' 
@@ -71,7 +75,7 @@ jobs:
         AB_RUN_ID: ${{ github.run_id }}
         AB_HEAD_SHA: 7a89436952878d6e2e0b7322c429d2bc719f0ebc
         AB_WORKFLOW_DIGEST: 
-          fc9e447e2e9829a3db337a08670bc270a01bfeeb02ce5239f008de83a5262b44
+          d82f1f917cfb20ceaf5c8175fd6a30a316f811a97e88a6c780b578258704518a
         AB_EVENT: ${{ github.event_name }}
         AB_SCHEDULE: ${{ github.event.schedule || '' }}
         AB_VARIABLES: ${{ toJSON(vars) }}

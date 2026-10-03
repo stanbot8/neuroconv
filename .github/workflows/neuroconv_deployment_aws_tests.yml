@@ -33,7 +33,8 @@ jobs:
         ref: ${{ (github.event_name == 'schedule' || github.event_name == 
           'workflow_run') && '7a89436952878d6e2e0b7322c429d2bc719f0ebc' || 
           github.sha }}
-    - run: git fetch --prune --unshallow --tags
+    - run: |-
+        git fetch --prune --unshallow --tags
     - name: Setup Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
       with:
@@ -46,11 +47,13 @@ jobs:
         git config --global user.name "CI Almighty"
 
     - name: Install AWS requirements
-      run: pip install .[aws,test]
+      run: |-
+        pip install .[aws,test]
+
 
     - name: Run NeuroConv Deployment on AWS tests
-      run: pytest -rsx -n auto 
-        tests/remote_transfer_services/neuroconv_deployment_aws_tools_tests.py
+      run: |-
+        pytest -rsx -n auto tests/remote_transfer_services/neuroconv_deployment_aws_tools_tests.py
     needs:
     - alpha_bridge_inputs
     if: ${{ (success()) && needs.alpha_bridge_inputs.outputs.changed == 'true' 
@@ -76,7 +79,7 @@ jobs:
         AB_RUN_ID: ${{ github.run_id }}
         AB_HEAD_SHA: 7a89436952878d6e2e0b7322c429d2bc719f0ebc
         AB_WORKFLOW_DIGEST: 
-          8afcacd24b0f6a36d450698014e153086c9cf6fc28ab967d0426165e26baa909
+          8f5c62efa2eef9fb577e9a47a48bfdaad8a7e3b338210582d3cca53b416db97f
         AB_EVENT: ${{ github.event_name }}
         AB_SCHEDULE: ${{ github.event.schedule || '' }}
         AB_VARIABLES: ${{ toJSON(vars) }}

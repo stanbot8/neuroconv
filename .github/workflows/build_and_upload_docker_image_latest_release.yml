@@ -31,7 +31,8 @@ jobs:
         version_tag=${tags: -6 : 6}
         echo "version_tag=$version_tag" >> $GITHUB_OUTPUT
     - name: Printout parsed version for GitHub Action log
-      run: echo ${{ steps.parsed_version.outputs.version_tag }}
+      run: |-
+        echo ${{ steps.parsed_version.outputs.version_tag }}
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
     - name: Set up Docker Buildx
@@ -77,7 +78,7 @@ jobs:
         AB_RUN_ID: ${{ github.run_id }}
         AB_HEAD_SHA: 7a89436952878d6e2e0b7322c429d2bc719f0ebc
         AB_WORKFLOW_DIGEST: 
-          cf4c812c8d894e1679bbaf66634727d74d3632b07bea2b4b6859eb328a99de37
+          4fe96a5e71a072194fca6a98d7e8a7e62d13ec25b1879ba6895fa6e907a13d9a
         AB_EVENT: ${{ github.event_name }}
         AB_SCHEDULE: ${{ github.event.schedule || '' }}
         AB_VARIABLES: ${{ toJSON(vars) }}

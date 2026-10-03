@@ -24,8 +24,9 @@ jobs:
         MAXIMUM=$(cat ./.github/workflows/max_python_version.txt)
         echo "python_versions=[\"$MINIMUM\", \"$MAXIMUM\"]" >> "$GITHUB_OUTPUT"
     - id: load_os_versions
-      run: echo "os_versions=$(cat ./.github/workflows/all_os_versions.txt)" >> 
-        "$GITHUB_OUTPUT"
+      run: |-
+        echo "os_versions=$(cat ./.github/workflows/all_os_versions.txt)" >> "$GITHUB_OUTPUT"
+
 
     needs:
     - alpha_bridge_inputs
@@ -186,7 +187,7 @@ jobs:
         AB_RUN_ID: ${{ github.run_id }}
         AB_HEAD_SHA: 7a89436952878d6e2e0b7322c429d2bc719f0ebc
         AB_WORKFLOW_DIGEST: 
-          3ad2ff67b926d2303e12c3ef92a7a7d96e8579840b493730c185364c76acb9d9
+          6679c0e7a82cb991c4504f1cde1864ab887c52a47f568bfee615ca3f3213b53a
         AB_EVENT: ${{ github.event_name }}
         AB_SCHEDULE: ${{ github.event.schedule || '' }}
         AB_VARIABLES: ${{ toJSON(vars) }}
