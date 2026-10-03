@@ -1,23 +1,27 @@
 {
   "definition_blob_sha1": {
-    ".github/workflows/alpha-bridge-ci-verify.yml": "211d78b275bbb87055d46d18edfc9b309afb7fd3",
-    ".github/workflows/dailies.yml": "a53de36d9c9f5730a74eda7391989a5de82b109c",
-    ".github/workflows/dev-dailies.yml": "88d9eac4acea39cb8f0b9eafa26f89510f4992ea",
-    ".github/workflows/generic_aws_tests.yml": "de7c5e285c2525f7d4de5ab0a86f0194705fa000",
-    ".github/workflows/neuroconv_deployment_aws_tests.yml": "e3382766e6d1826911b1e3aa556526e55d362080",
-    ".github/workflows/rclone_aws_tests.yml": "744e618e74239b0c86d88dbe7e052cae6d44ea39",
-    ".github/workflows/weeklies.yml": "a8cf88e5842a880dda51538c8c89500ac28e38c9"
+    ".github/workflows/alpha-bridge-ci-verify.yml": "21051178fb840f31162cde1a64943007a2178f3f",
+    ".github/workflows/build_and_upload_docker_image_latest_release.yml": "51c02b81dc6dab0f412370fdcb100d64c35bd495",
+    ".github/workflows/build_and_upload_docker_image_yaml_variable.yml": "6d0aa0662da356598d5c7dcb6e52e08ac17357fd",
+    ".github/workflows/dailies.yml": "930a38fc1da71f49767e75a982c120c99525e02c",
+    ".github/workflows/dev-dailies.yml": "a0aeb4404672e6e0997c615090172d4e4de9a8af",
+    ".github/workflows/generic_aws_tests.yml": "c79801f1a87c1aeede01dcb9b9fd545c56ca3f89",
+    ".github/workflows/neuroconv_deployment_aws_tests.yml": "e30bd0bcaccda15350502f64fef8ac0edd6f6bcf",
+    ".github/workflows/rclone_aws_tests.yml": "c18bc6e7ebe349d46aa9d4d96936b08f40197573",
+    ".github/workflows/weeklies.yml": "16d9e639d7e33cf894695432662c39b3607ba97f"
   },
   "definition_sha256": {
-    ".github/workflows/alpha-bridge-ci-verify.yml": "4cac5461d20019fd71bd15ab6e775a433bcfc570d3cc96f9132a4bf68d15c04e",
-    ".github/workflows/dailies.yml": "837b2b12a78872c64fcbaa9b80ae3db2e938e509b591be73c1c4171f3edceec8",
-    ".github/workflows/dev-dailies.yml": "b25e0d57333419ee180e271892c9ee8bc5a373598e9099f607e85df1ef57bc4e",
-    ".github/workflows/generic_aws_tests.yml": "fd8c19044f201369c2130a9735178d2a7adf79d0b6543f1cf9283ba35cac1027",
-    ".github/workflows/neuroconv_deployment_aws_tests.yml": "49414d29ca6e251ecccd5c356dc18726ed0f9b492c1552c152e4e9f9daa695c6",
-    ".github/workflows/rclone_aws_tests.yml": "366d1d9c6015f5dbe9a0bede9cd323f29fd576e8ba9153b4d7e2d1e80ecd18f7",
-    ".github/workflows/weeklies.yml": "6f21403105507327cbecff6ff4d3239597fbce564f016fe708f4f3bf561dc923"
+    ".github/workflows/alpha-bridge-ci-verify.yml": "f1d0d506e1faf2ef9e00102fbf464fa1a74203bf3463e623621402b9de9e8a45",
+    ".github/workflows/build_and_upload_docker_image_latest_release.yml": "95671632324e7b0c52614b8d0e8de0dfd77d1965c92d2bbbb941da5ac98ef591",
+    ".github/workflows/build_and_upload_docker_image_yaml_variable.yml": "d242c2d949322b790a9945cdc378b81b365c911c511f6e08c9108c2caa9ea013",
+    ".github/workflows/dailies.yml": "f061c0523be1f88eaa2f8551a75886a869e0d8f50578baa2334e386007e7cc3c",
+    ".github/workflows/dev-dailies.yml": "dd21b3a2ed57273994e01cfe6829a2565976c6423eea2db23a67310dcf0b93fd",
+    ".github/workflows/generic_aws_tests.yml": "fc797d8b47e75389653f56aec9443143ea5adab0395db897ac9c8f639303ad0f",
+    ".github/workflows/neuroconv_deployment_aws_tests.yml": "4e9e75cddacff50f3b1449813c364c593759e6b35e09845aaf28f26278929e39",
+    ".github/workflows/rclone_aws_tests.yml": "160de0e51414c71808606658da159d78be40a9ce76bae13259d7290e655971e4",
+    ".github/workflows/weeklies.yml": "55c81df6ae8637896cd6bcb3f369a57e1d04640cf97091ee046834e0010f0826"
   },
-  "generator_sha256": "3b26cda454cba3b637212cdea3d130c69e2223d93535daef4f59e8f73b2e6cc3",
+  "generator_sha256": "d20fb8b8348d1a9a5c6e1057d775b208188196d5c2634d6ec392227f92b995f5",
   "schema": "alpha-bridge/fork-ci",
   "source_branch": "main",
   "source_commit": "7a89436952878d6e2e0b7322c429d2bc719f0ebc",
@@ -25,6 +29,8 @@
   "version": 1,
   "workflows": [
     ".github/workflows/alpha-bridge-ci-verify.yml",
+    ".github/workflows/build_and_upload_docker_image_latest_release.yml",
+    ".github/workflows/build_and_upload_docker_image_yaml_variable.yml",
     ".github/workflows/dailies.yml",
     ".github/workflows/dev-dailies.yml",
     ".github/workflows/generic_aws_tests.yml",
