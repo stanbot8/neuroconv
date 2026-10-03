@@ -25,10 +25,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version:
-        - '3.12'
-        os:
-        - ubuntu-latest
+        python-version: ['3.12']
+        os: [ubuntu-latest]
     steps:
     - uses: actions/checkout@v6
       with:
@@ -78,7 +76,7 @@ jobs:
         AB_RUN_ID: ${{ github.run_id }}
         AB_HEAD_SHA: 7a89436952878d6e2e0b7322c429d2bc719f0ebc
         AB_WORKFLOW_DIGEST: 
-          309597de6e97ab478d1e1dc59fa97daf9b354bc0145f9d242a772a8e0dedd4dc
+          cf3642207affc847262c4cf0b273762a5e0aeef41d4952f42ade33aa9776bb74
         AB_EVENT: ${{ github.event_name }}
         AB_SCHEDULE: ${{ github.event.schedule || '' }}
         AB_VARIABLES: ${{ toJSON(vars) }}

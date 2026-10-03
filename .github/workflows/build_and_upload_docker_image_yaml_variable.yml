@@ -2,10 +2,8 @@ name: Build and Upload Docker Image of latest with YAML variable to GHCR
 
 on:
   workflow_run:
-    workflows:
-    - Build and Upload Docker Image of Latest Release to GHCR
-    types:
-    - completed
+    workflows: [Build and Upload Docker Image of Latest Release to GHCR]
+    types: [completed]
   workflow_dispatch:
 
 concurrency:  # Cancel previous workflows on the same pull request
@@ -68,7 +66,7 @@ jobs:
         AB_RUN_ID: ${{ github.run_id }}
         AB_HEAD_SHA: 7a89436952878d6e2e0b7322c429d2bc719f0ebc
         AB_WORKFLOW_DIGEST: 
-          158eb2b68654af18382e902d201ea1e757e161d8a12340eddf04d86d85fee3de
+          55c1ff07149232f8ddf2b335c635c6a66a98dd849a1d47a117643603cb3efb5b
         AB_EVENT: ${{ github.event_name }}
         AB_SCHEDULE: ${{ github.event.schedule || '' }}
         AB_VARIABLES: ${{ toJSON(vars) }}
