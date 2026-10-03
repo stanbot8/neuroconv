@@ -5,7 +5,8 @@ on:
   workflow_dispatch:
 
 concurrency:  # Cancel previous workflows on the same pull request
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'schedule' && 
+    'refs/heads/main' || github.ref) }}
   cancel-in-progress: ${{ github.event_name != 'schedule' && (true) }}
 
 env:
@@ -23,10 +24,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.12']
-        os: [ubuntu-latest]
+        python-version:
+        - '3.12'
+        os:
+        - ubuntu-latest
     steps:
     - uses: actions/checkout@v6
+      with:
+        ref: ${{ github.event_name == 'schedule' && 
+          '7a89436952878d6e2e0b7322c429d2bc719f0ebc' || github.sha }}
     - run: git fetch --prune --unshallow --tags
     - name: Setup Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
@@ -45,6 +51,13 @@ jobs:
     - name: Run NeuroConv Deployment on AWS tests
       run: pytest -rsx -n auto 
         tests/remote_transfer_services/neuroconv_deployment_aws_tools_tests.py
+    env:
+      ALPHA_BRIDGE_SOURCE_SHA: ${{ github.event_name == 'schedule' && 
+        '7a89436952878d6e2e0b7322c429d2bc719f0ebc' || github.sha }}
+      ALPHA_BRIDGE_SOURCE_REF: ${{ github.event_name == 'schedule' && 
+        'refs/heads/main' || github.ref }}
+      ALPHA_BRIDGE_SOURCE_REF_NAME: ${{ github.event_name == 'schedule' && 
+        'main' || github.ref_name }}
     needs:
     - alpha_bridge_inputs
     if: ${{ (success()) && needs.alpha_bridge_inputs.outputs.changed == 'true' 
@@ -70,7 +83,7 @@ jobs:
         AB_RUN_ID: ${{ github.run_id }}
         AB_HEAD_SHA: 7a89436952878d6e2e0b7322c429d2bc719f0ebc
         AB_WORKFLOW_DIGEST: 
-          e36697e54bddddb87f23fefa604a9ea09af29be5ae057c0b8d21b78c55cc3439
+          ad8be55d42bba72fdf2b8fa54cca5736e9043c0097445df9f8266e90ab6776d5
         AB_EVENT: ${{ github.event_name }}
         AB_SCHEDULE: ${{ github.event.schedule || '' }}
         AB_VARIABLES: ${{ toJSON(vars) }}

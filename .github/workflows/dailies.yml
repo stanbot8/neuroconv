@@ -14,6 +14,9 @@ jobs:
       ALL_OS_VERSIONS: ${{ steps.load_os_versions.outputs.os_versions }}
     steps:
     - uses: actions/checkout@v6
+      with:
+        ref: ${{ github.event_name == 'schedule' && 
+          '7a89436952878d6e2e0b7322c429d2bc719f0ebc' || github.sha }}
     - id: load_python_versions
       run: |
         MINIMUM=$(cat ./.github/workflows/min_python_version.txt)
@@ -23,6 +26,13 @@ jobs:
       run: echo "os_versions=$(cat ./.github/workflows/all_os_versions.txt)" >> 
         "$GITHUB_OUTPUT"
 
+    env:
+      ALPHA_BRIDGE_SOURCE_SHA: ${{ github.event_name == 'schedule' && 
+        '7a89436952878d6e2e0b7322c429d2bc719f0ebc' || github.sha }}
+      ALPHA_BRIDGE_SOURCE_REF: ${{ github.event_name == 'schedule' && 
+        'refs/heads/main' || github.ref }}
+      ALPHA_BRIDGE_SOURCE_REF_NAME: ${{ github.event_name == 'schedule' && 
+        'main' || github.ref_name }}
     needs:
     - alpha_bridge_inputs
     if: ${{ (success()) && needs.alpha_bridge_inputs.outputs.changed == 'true' 
@@ -66,6 +76,13 @@ jobs:
           https://github.com/catalystneuro/neuroconv/actions/workflows/dailies.yml
 
 
+    env:
+      ALPHA_BRIDGE_SOURCE_SHA: ${{ github.event_name == 'schedule' && 
+        '7a89436952878d6e2e0b7322c429d2bc719f0ebc' || github.sha }}
+      ALPHA_BRIDGE_SOURCE_REF: ${{ github.event_name == 'schedule' && 
+        'refs/heads/main' || github.ref }}
+      ALPHA_BRIDGE_SOURCE_REF_NAME: ${{ github.event_name == 'schedule' && 
+        'main' || github.ref_name }}
   run-daily-formatwise-installation-testing:
     uses: ./.github/workflows/formatwise-installation-testing.yml
     secrets:
@@ -97,6 +114,13 @@ jobs:
         body: The daily formatwise installation test workflow failed, please 
           check status at 
           https://github.com/catalystneuro/neuroconv/actions/workflows/dailies.yml
+    env:
+      ALPHA_BRIDGE_SOURCE_SHA: ${{ github.event_name == 'schedule' && 
+        '7a89436952878d6e2e0b7322c429d2bc719f0ebc' || github.sha }}
+      ALPHA_BRIDGE_SOURCE_REF: ${{ github.event_name == 'schedule' && 
+        'refs/heads/main' || github.ref }}
+      ALPHA_BRIDGE_SOURCE_REF_NAME: ${{ github.event_name == 'schedule' && 
+        'main' || github.ref_name }}
   alpha_bridge_inputs:
     name: AlphaBridge input check
     runs-on: ubuntu-latest
@@ -118,7 +142,7 @@ jobs:
         AB_RUN_ID: ${{ github.run_id }}
         AB_HEAD_SHA: 7a89436952878d6e2e0b7322c429d2bc719f0ebc
         AB_WORKFLOW_DIGEST: 
-          d954d9e6f3d5afccead8ba37e5bc5b8f4321b769f54fe65385d250d82f94e2a6
+          9c1a700979ed1fe4f10c4bb8485917241a38544cf78dc42dcc1091c312895da3
         AB_EVENT: ${{ github.event_name }}
         AB_SCHEDULE: ${{ github.event.schedule || '' }}
         AB_VARIABLES: ${{ toJSON(vars) }}

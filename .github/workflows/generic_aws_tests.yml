@@ -5,7 +5,8 @@ on:
   workflow_dispatch:
 
 concurrency:  # Cancel previous workflows on the same pull request
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'schedule' && 
+    'refs/heads/main' || github.ref) }}
   cancel-in-progress: ${{ github.event_name != 'schedule' && (true) }}
 
 env:
@@ -19,10 +20,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.12']
-        os: [ubuntu-latest]
+        python-version:
+        - '3.12'
+        os:
+        - ubuntu-latest
     steps:
     - uses: actions/checkout@v6
+      with:
+        ref: ${{ github.event_name == 'schedule' && 
+          '7a89436952878d6e2e0b7322c429d2bc719f0ebc' || github.sha }}
     - run: git fetch --prune --unshallow --tags
     - name: Setup Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
@@ -40,6 +46,13 @@ jobs:
 
     - name: Run generic AWS tests
       run: pytest -rsx -n auto tests/remote_transfer_services/aws_tools_tests.py
+    env:
+      ALPHA_BRIDGE_SOURCE_SHA: ${{ github.event_name == 'schedule' && 
+        '7a89436952878d6e2e0b7322c429d2bc719f0ebc' || github.sha }}
+      ALPHA_BRIDGE_SOURCE_REF: ${{ github.event_name == 'schedule' && 
+        'refs/heads/main' || github.ref }}
+      ALPHA_BRIDGE_SOURCE_REF_NAME: ${{ github.event_name == 'schedule' && 
+        'main' || github.ref_name }}
     needs:
     - alpha_bridge_inputs
     if: ${{ (success()) && needs.alpha_bridge_inputs.outputs.changed == 'true' 
@@ -65,7 +78,7 @@ jobs:
         AB_RUN_ID: ${{ github.run_id }}
         AB_HEAD_SHA: 7a89436952878d6e2e0b7322c429d2bc719f0ebc
         AB_WORKFLOW_DIGEST: 
-          5ba069627cdae1407608a381f26a0f847d0136e55fc09cc5a1cb5026e3b60be9
+          3978dda2ece13de44c90a17e0a407085c8e24e84175bfafeda799a345316b244
         AB_EVENT: ${{ github.event_name }}
         AB_SCHEDULE: ${{ github.event.schedule || '' }}
         AB_VARIABLES: ${{ toJSON(vars) }}
