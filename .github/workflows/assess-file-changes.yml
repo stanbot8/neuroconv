@@ -5,24 +5,22 @@ on:
     # Map the workflow outputs to job outputs
     outputs:
       SOURCE_CHANGED:
-        description: Whether the files under /src/ were changed.
+        description: "Whether the files under /src/ were changed."
         value: ${{ jobs.build.outputs.SOURCE_CHANGED }}
       CONVERSION_GALLERY_CHANGED:
-        description: Whether the files under /docs/conversion_examples_gallery/ 
-          were changed.
+        description: "Whether the files under /docs/conversion_examples_gallery/ were
+          changed."
         value: ${{ jobs.build.outputs.CONVERSION_GALLERY_CHANGED }}
       CHANGELOG_ENTRY_ADDED:
-        description: Whether a changelog entry was added under 
-          /changelog_entries/.
+        description: "Whether a changelog entry was added under /changelog_entries/."
         value: ${{ jobs.build.outputs.CHANGELOG_ENTRY_ADDED }}
       PYPROJECT_DEPENDENCIES_CHANGED:
-        description: Whether pyproject.toml's [project.dependencies] or 
-          [project.optional-dependencies] changed, which can break what a 
-          gallery page installs.
+        description: "Whether pyproject.toml's [project.dependencies] or [project.optional-dependencies]
+          changed, which can break what a gallery page installs."
         value: ${{ jobs.build.outputs.PYPROJECT_DEPENDENCIES_CHANGED }}
       CHANGED_GALLERY_PAGES:
-        description: The changed files under /docs/conversion_examples_gallery/,
-          space separated, so the formatwise job can test only those pages.
+        description: "The changed files under /docs/conversion_examples_gallery/,
+          space separated, so the formatwise job can test only those pages."
         value: ${{ jobs.build.outputs.CHANGED_GALLERY_PAGES }}
 
 jobs:
@@ -42,74 +40,74 @@ jobs:
 
     name: Test changed-files
     steps:
-    - uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-        ref: ${{ (github.event_name == 'schedule' || github.event_name == 
-          'workflow_run') && '86978c9c7013694b777e37d9a1ad2b32e7e14c3c' || 
-          github.sha }}
-    - name: Get changed files
-      id: changed-files
-      uses: tj-actions/changed-files@v47.0.6
+          ref: ${{ (github.event_name == 'schedule' || github.event_name == 
+            'workflow_run') && '86978c9c7013694b777e37d9a1ad2b32e7e14c3c' || 
+            github.sha }}
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v47.0.6
 
-    - name: Assess Source Code Changes
-      id: assess-changes
-      run: |
-        echo "SOURCE_CHANGED=false" >> $GITHUB_OUTPUT
-        echo "CONVERSION_GALLERY_CHANGED=false" >> $GITHUB_OUTPUT
-        echo "CHANGELOG_ENTRY_ADDED=false" >> $GITHUB_OUTPUT
-        PYPROJECT_TOUCHED=false
-        GALLERY_PAGES=""
-        for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-          echo $file
-          if [[ $file == "src/"* || $file == "tests/"* || $file == "pyproject.toml"   || $file == "setup.py" || $file == ".github/"* ]]
+      - name: Assess Source Code Changes
+        id: assess-changes
+        run: |
+          echo "SOURCE_CHANGED=false" >> $GITHUB_OUTPUT
+          echo "CONVERSION_GALLERY_CHANGED=false" >> $GITHUB_OUTPUT
+          echo "CHANGELOG_ENTRY_ADDED=false" >> $GITHUB_OUTPUT
+          PYPROJECT_TOUCHED=false
+          GALLERY_PAGES=""
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            echo $file
+            if [[ $file == "src/"* || $file == "tests/"* || $file == "pyproject.toml"   || $file == "setup.py" || $file == ".github/"* ]]
+            then
+              echo "Source changed"
+              echo "SOURCE_CHANGED=true" >> $GITHUB_OUTPUT
+            else
+              echo "Source not changed"
+            fi
+            if [[ $file == "docs/conversion_examples_gallery/"* ]]
+            then
+              echo "Conversion gallery changed"
+              echo "CONVERSION_GALLERY_CHANGED=true" >> $GITHUB_OUTPUT
+              GALLERY_PAGES="$GALLERY_PAGES $file"
+            else
+              echo "Conversion gallery not changed"
+            fi
+            # The name has to carry this pull request's own number, since `give_next_pr_number` predicts
+            # the number and does not reserve it, so an entry can end up pointing at somebody else's.
+            if [[ $file == "changelog_entries/${{ github.event.pull_request.number }}."*".md" ]]
+            then
+              echo "Changelog entry added"
+              echo "CHANGELOG_ENTRY_ADDED=true" >> $GITHUB_OUTPUT
+            else
+              echo "Changelog entry not added"
+            fi
+            if [[ $file == "pyproject.toml" ]]
+            then
+              echo "pyproject changed"
+              PYPROJECT_TOUCHED=true
+            else
+              echo "pyproject not changed"
+            fi
+          done
+          echo "CHANGED_GALLERY_PAGES=$(echo $GALLERY_PAGES | xargs)" >> $GITHUB_OUTPUT
+          # Only the dependency tables decide what `.[extra]` resolves to. A version bump or a tool's
+          # configuration lives in the same file and does not need the sweep.
+          if [[ $PYPROJECT_TOUCHED == "true" ]]
           then
-            echo "Source changed"
-            echo "SOURCE_CHANGED=true" >> $GITHUB_OUTPUT
+            DEPENDENCIES_CHANGED=$(python3 .github/scripts/dependencies_changed.py "${{ github.event.pull_request.base.sha }}")
           else
-            echo "Source not changed"
+            DEPENDENCIES_CHANGED=false
           fi
-          if [[ $file == "docs/conversion_examples_gallery/"* ]]
-          then
-            echo "Conversion gallery changed"
-            echo "CONVERSION_GALLERY_CHANGED=true" >> $GITHUB_OUTPUT
-            GALLERY_PAGES="$GALLERY_PAGES $file"
-          else
-            echo "Conversion gallery not changed"
-          fi
-          # The name has to carry this pull request's own number, since `give_next_pr_number` predicts
-          # the number and does not reserve it, so an entry can end up pointing at somebody else's.
-          if [[ $file == "changelog_entries/${{ github.event.pull_request.number }}."*".md" ]]
-          then
-            echo "Changelog entry added"
-            echo "CHANGELOG_ENTRY_ADDED=true" >> $GITHUB_OUTPUT
-          else
-            echo "Changelog entry not added"
-          fi
-          if [[ $file == "pyproject.toml" ]]
-          then
-            echo "pyproject changed"
-            PYPROJECT_TOUCHED=true
-          else
-            echo "pyproject not changed"
-          fi
-        done
-        echo "CHANGED_GALLERY_PAGES=$(echo $GALLERY_PAGES | xargs)" >> $GITHUB_OUTPUT
-        # Only the dependency tables decide what `.[extra]` resolves to. A version bump or a tool's
-        # configuration lives in the same file and does not need the sweep.
-        if [[ $PYPROJECT_TOUCHED == "true" ]]
-        then
-          DEPENDENCIES_CHANGED=$(python3 .github/scripts/dependencies_changed.py "${{ github.event.pull_request.base.sha }}")
-        else
-          DEPENDENCIES_CHANGED=false
-        fi
-        echo "pyproject dependencies changed: $DEPENDENCIES_CHANGED"
-        echo "PYPROJECT_DEPENDENCIES_CHANGED=$DEPENDENCIES_CHANGED" >> $GITHUB_OUTPUT
+          echo "pyproject dependencies changed: $DEPENDENCIES_CHANGED"
+          echo "PYPROJECT_DEPENDENCIES_CHANGED=$DEPENDENCIES_CHANGED" >> $GITHUB_OUTPUT
     needs:
-    - alpha_bridge_inputs
-    if: ${{ (success()) && needs.alpha_bridge_inputs.outputs.changed == 'true' 
-      }}
+      - alpha_bridge_inputs
+    if: |-
+      ${{ (success()) && needs.alpha_bridge_inputs.outputs.changed == 'true' }}
   alpha_bridge_inputs:
     name: CI input check
     runs-on: ubuntu-latest
@@ -123,115 +121,116 @@ jobs:
     outputs:
       changed: ${{ steps.identity.outputs.changed }}
     steps:
-    - id: identity
-      name: Check source, workflow, variables, and runner inputs
-      env:
-        GH_TOKEN: ${{ github.token }}
-        AB_REPOSITORY: ${{ github.repository }}
-        AB_RUN_ID: ${{ github.run_id }}
-        AB_HEAD_SHA: ${{ (github.event_name == 'schedule' || github.event_name 
-          == 'workflow_run') && '86978c9c7013694b777e37d9a1ad2b32e7e14c3c' || 
-          github.sha }}
-        AB_REF: ${{ (github.event_name == 'schedule' || github.event_name == 
-          'workflow_run') && 'refs/heads/main' || github.ref }}
-        AB_WORKFLOW_DIGEST: 
-          6cd5e6b3407d3e72860ef869f965500677dee048a947cf45978e7fe1bca3d956
-        AB_EVENT: ${{ github.event_name }}
-        AB_SCHEDULE: ${{ github.event.schedule || '' }}
-        AB_VARIABLES: ${{ toJSON(vars) }}
-        AB_INPUTS: ${{ toJSON(inputs) }}
-        AB_WORKFLOW_RUN: ${{ toJSON(github.event.workflow_run) }}
-      shell: bash
-      run: "python3 - <<'ALPHA_BRIDGE_CI_PY'\n\"\"\"Native automatic-CI input check,
-        embedded in the owned fork configuration.\"\"\"\n\nfrom __future__ import
-        annotations\n\nimport base64\nimport hashlib\nimport json\nimport os\nimport
-        re\nimport urllib.parse\nimport urllib.request\n\nINPUT_CHECK_NAMES = (\"\
-        CI input check\", \"AlphaBridge input check\")\nINPUT_IDENTITY_PREFIXES =
-        (\"CI input identity \", \"AlphaBridge input identity \")\n\n\ndef input_identity(job):\n\
-        \    for step in job.get(\"steps\", []):\n        if step.get(\"conclusion\"\
-        ) != \"success\":\n            continue\n        name = step.get(\"name\"\
-        , \"\")\n        for prefix in INPUT_IDENTITY_PREFIXES:\n            if name.startswith(prefix):\n\
-        \                identity = name.removeprefix(prefix)\n                if
-        re.fullmatch(r\"[0-9a-f]{64}\", identity):\n                    return identity\n\
-        \    return \"\"\n\n\ndef parent_has_work(get, repository, parent):\n    if
-        (\n        not parent\n        or parent.get(\"head_branch\") != \"alpha-bridge-ci\"\
-        \n        or parent.get(\"status\") != \"completed\"\n    ):\n        return
-        True\n    sha = parent[\"head_sha\"]\n    if re.fullmatch(r\"[0-9a-f]{40}\"\
-        , sha) is None:\n        raise ValueError(\"parent workflow has no exact configuration
-        commit\")\n    record = get(f\"/repos/{repository}\")\n    marker_file = get(f\"\
-        /repos/{repository}/contents/.github/alpha-bridge-ci.json?ref={sha}\")\n \
-        \   marker = json.loads(base64.b64decode(marker_file[\"content\"]))\n    if
-        (\n        record.get(\"fork\") is not True\n        or marker.get(\"schema\"\
-        ) != \"alpha-bridge/fork-ci\"\n        or marker.get(\"source_repository\"\
-        ) != record.get(\"parent\", {}).get(\"full_name\")\n    ):\n        raise
-        ValueError(\"parent CI configuration has no verified fork ownership\")\n \
-        \   path = parent[\"path\"].split(\"@\", 1)[0]\n    if not path.startswith(\"\
-        .github/workflows/\") or \"/\" in path.removeprefix(\".github/workflows/\"\
-        ):\n        raise ValueError(\"parent workflow path is outside its configuration
-        owner\")\n    definition = get(f\"/repos/{repository}/contents/{urllib.parse.quote(path,
-        safe='/')}?ref={sha}\")\n    if hashlib.sha256(base64.b64decode(definition[\"\
-        content\"])).hexdigest() != marker.get(\n        \"definition_sha256\", {}\n\
-        \    ).get(path):\n        raise ValueError(\"parent workflow differs from
-        its owned definition\")\n    if path == \".github/workflows/alpha-bridge-ci-verify.yml\"\
-        :\n        return False\n    jobs = []\n    page = 1\n    while True:\n  \
-        \      values = get(\n            f\"/repos/{repository}/actions/runs/{parent['id']}/jobs?per_page=100&page={page}\"\
-        \n        )[\"jobs\"]\n        jobs.extend(values)\n        if len(values)
-        < 100:\n            break\n        page += 1\n    guards = [\n        job\n\
-        \        for job in jobs\n        if job.get(\"name\") in INPUT_CHECK_NAMES\n\
-        \        and job.get(\"conclusion\") == \"success\"\n        and input_identity(job)\n\
-        \    ]\n    return not guards or any(\n        job not in guards and job.get(\"\
-        conclusion\") != \"skipped\" for job in jobs\n    )\n\n\ndef changed(get,
-        *, repository, run_id, identity, job_name):\n    current = get(f\"/repos/{repository}/actions/runs/{run_id}\"\
-        )\n    event = current[\"event\"]\n    page = 1\n    while True:\n       \
-        \ # Filter locally: GitHub caps filtered searches at 1,000 results.\n    \
-        \    query = urllib.parse.urlencode({\"per_page\": 100, \"page\": page})\n\
-        \        runs = get(f\"/repos/{repository}/actions/workflows/{current['workflow_id']}/runs?{query}\"\
-        )\n        for run in runs[\"workflow_runs\"]:\n            if run[\"id\"\
-        ] == run_id:\n                continue\n            if run.get(\"head_branch\"\
-        ) != current[\"head_branch\"] or run.get(\"event\") != event:\n          \
-        \      continue\n            job_page = 1\n            while True:\n     \
-        \           jobs = get(\n                    f\"/repos/{repository}/actions/runs/{run['id']}/jobs?per_page=100&page={job_page}\"\
-        \n                )[\"jobs\"]\n                for job in jobs:\n        \
-        \            if (\n                        (\n                           \
-        \ job[\"name\"] in INPUT_CHECK_NAMES\n                            if job_name
-        in INPUT_CHECK_NAMES\n                            else job[\"name\"] == job_name\n\
-        \                        )\n                        and job.get(\"status\"\
-        ) == \"completed\"\n                        and job.get(\"conclusion\") ==
-        \"success\"\n                        and input_identity(job) == identity\n\
-        \                    ):\n                        return False\n          \
-        \      if len(jobs) < 100:\n                    break\n                job_page
-        += 1\n        if len(runs[\"workflow_runs\"]) < 100:\n            return True\n\
-        \        page += 1\n\n\ndef main():\n    event = os.environ[\"AB_EVENT\"]\n\
-        \    event_payload = None\n    if event not in {\"schedule\", \"workflow_run\"\
-        }:\n        with open(os.environ[\"GITHUB_EVENT_PATH\"], encoding=\"utf-8\"\
-        ) as payload_file:\n            event_payload = json.load(payload_file)\n\
-        \    inputs = {\n        \"source_commit\": os.environ[\"AB_HEAD_SHA\"],\n\
-        \        \"source_ref\": os.environ[\"AB_REF\"],\n        \"workflow_definition\"\
-        : os.environ[\"AB_WORKFLOW_DIGEST\"],\n        \"event\": event,\n       \
-        \ \"event_payload\": event_payload,\n        \"schedule\": os.environ[\"AB_SCHEDULE\"\
-        ],\n        \"variables\": json.loads(os.environ[\"AB_VARIABLES\"]),\n   \
-        \     \"inputs\": json.loads(os.environ[\"AB_INPUTS\"]),\n        \"runner_image\"\
-        : [os.environ.get(\"ImageOS\", \"\"), os.environ.get(\"ImageVersion\", \"\"\
-        )],\n        \"producer\": json.loads(os.environ.get(\"AB_WORKFLOW_RUN\",
-        \"null\")),\n    }\n    identity = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()\n\
-        \n    def get(path):\n        request = urllib.request.Request(\n        \
-        \    \"https://api.github.com\" + path,\n            headers={\n         \
-        \       \"Authorization\": \"Bearer \" + os.environ[\"GH_TOKEN\"],\n     \
-        \           \"Accept\": \"application/vnd.github+json\",\n               \
-        \ \"X-GitHub-Api-Version\": \"2026-03-10\",\n            },\n        )\n \
-        \       with urllib.request.urlopen(request, timeout=60) as response:\n  \
-        \          return json.load(response)\n\n    manual = event == \"workflow_dispatch\"\
-        \ or int(os.environ[\"GITHUB_RUN_ATTEMPT\"]) > 1\n    should_run = manual
-        or (\n        (\n            inputs[\"event\"] != \"workflow_run\"\n     \
-        \       or parent_has_work(get, os.environ[\"AB_REPOSITORY\"], inputs[\"producer\"\
-        ])\n        )\n        and changed(\n            get,\n            repository=os.environ[\"\
-        AB_REPOSITORY\"],\n            run_id=int(os.environ[\"AB_RUN_ID\"]),\n  \
-        \          identity=identity,\n            job_name=\"CI input check\",\n\
-        \        )\n    )\n    with open(os.environ[\"GITHUB_OUTPUT\"], \"a\", encoding=\"\
-        utf-8\") as output:\n        output.write(f\"digest={identity}\\nchanged={str(should_run).lower()}\\\
-        n\")\n    print(\n        \"Explicit CI run requested\"\n        if manual\n\
-        \        else \"CI inputs changed\"\n        if should_run\n        else \"\
-        CI inputs unchanged; build and test jobs skipped\"\n    )\n\n\nif __name__
-        == \"__main__\":\n    main()\n\nALPHA_BRIDGE_CI_PY\n"
-    - name: CI input identity ${{ steps.identity.outputs.digest }}
-      run: echo 'Input identity recorded'
+      - id: identity
+        name: Check source, workflow, variables, and runner inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AB_REPOSITORY: ${{ github.repository }}
+          AB_RUN_ID: ${{ github.run_id }}
+          AB_HEAD_SHA: ${{ (github.event_name == 'schedule' || github.event_name
+            == 'workflow_run') && '86978c9c7013694b777e37d9a1ad2b32e7e14c3c' || 
+            github.sha }}
+          AB_REF: ${{ (github.event_name == 'schedule' || github.event_name == 
+            'workflow_run') && 'refs/heads/main' || github.ref }}
+          AB_WORKFLOW_DIGEST: 
+            e10388f7d24412db1c9c3d5826c14ef23840d35f9388ecbdc86e938019d1bdc5
+          AB_EVENT: ${{ github.event_name }}
+          AB_SCHEDULE: ${{ github.event.schedule || '' }}
+          AB_VARIABLES: ${{ toJSON(vars) }}
+          AB_INPUTS: ${{ toJSON(inputs) }}
+          AB_WORKFLOW_RUN: ${{ toJSON(github.event.workflow_run) }}
+        shell: bash
+        run: "python3 - <<'ALPHA_BRIDGE_CI_PY'\n\"\"\"Native automatic-CI input check,
+          embedded in the owned fork configuration.\"\"\"\n\nfrom __future__ import
+          annotations\n\nimport base64\nimport hashlib\nimport json\nimport os\nimport
+          re\nimport urllib.parse\nimport urllib.request\n\nINPUT_CHECK_NAMES = (\"\
+          CI input check\", \"AlphaBridge input check\")\nINPUT_IDENTITY_PREFIXES
+          = (\"CI input identity \", \"AlphaBridge input identity \")\n\n\ndef input_identity(job):\n\
+          \    for step in job.get(\"steps\", []):\n        if step.get(\"conclusion\"\
+          ) != \"success\":\n            continue\n        name = step.get(\"name\"\
+          , \"\")\n        for prefix in INPUT_IDENTITY_PREFIXES:\n            if
+          name.startswith(prefix):\n                identity = name.removeprefix(prefix)\n\
+          \                if re.fullmatch(r\"[0-9a-f]{64}\", identity):\n       \
+          \             return identity\n    return \"\"\n\n\ndef parent_has_work(get,
+          repository, parent):\n    if (\n        not parent\n        or parent.get(\"\
+          head_branch\") != \"alpha-bridge-ci\"\n        or parent.get(\"status\"\
+          ) != \"completed\"\n    ):\n        return True\n    sha = parent[\"head_sha\"\
+          ]\n    if re.fullmatch(r\"[0-9a-f]{40}\", sha) is None:\n        raise ValueError(\"\
+          parent workflow has no exact configuration commit\")\n    record = get(f\"\
+          /repos/{repository}\")\n    marker_file = get(f\"/repos/{repository}/contents/.github/alpha-bridge-ci.json?ref={sha}\"\
+          )\n    marker = json.loads(base64.b64decode(marker_file[\"content\"]))\n\
+          \    if (\n        record.get(\"fork\") is not True\n        or marker.get(\"\
+          schema\") != \"alpha-bridge/fork-ci\"\n        or marker.get(\"source_repository\"\
+          ) != record.get(\"parent\", {}).get(\"full_name\")\n    ):\n        raise
+          ValueError(\"parent CI configuration has no verified fork ownership\")\n\
+          \    path = parent[\"path\"].split(\"@\", 1)[0]\n    if not path.startswith(\"\
+          .github/workflows/\") or \"/\" in path.removeprefix(\".github/workflows/\"\
+          ):\n        raise ValueError(\"parent workflow path is outside its configuration
+          owner\")\n    definition = get(f\"/repos/{repository}/contents/{urllib.parse.quote(path,
+          safe='/')}?ref={sha}\")\n    if hashlib.sha256(base64.b64decode(definition[\"\
+          content\"])).hexdigest() != marker.get(\n        \"definition_sha256\",
+          {}\n    ).get(path):\n        raise ValueError(\"parent workflow differs
+          from its owned definition\")\n    if path == \".github/workflows/alpha-bridge-ci-verify.yml\"\
+          :\n        return False\n    jobs = []\n    page = 1\n    while True:\n\
+          \        values = get(\n            f\"/repos/{repository}/actions/runs/{parent['id']}/jobs?per_page=100&page={page}\"\
+          \n        )[\"jobs\"]\n        jobs.extend(values)\n        if len(values)
+          < 100:\n            break\n        page += 1\n    guards = [\n        job\n\
+          \        for job in jobs\n        if job.get(\"name\") in INPUT_CHECK_NAMES\n\
+          \        and job.get(\"conclusion\") == \"success\"\n        and input_identity(job)\n\
+          \    ]\n    return not guards or any(\n        job not in guards and job.get(\"\
+          conclusion\") != \"skipped\" for job in jobs\n    )\n\n\ndef changed(get,
+          *, repository, run_id, identity, job_name):\n    current = get(f\"/repos/{repository}/actions/runs/{run_id}\"\
+          )\n    event = current[\"event\"]\n    page = 1\n    while True:\n     \
+          \   # Filter locally: GitHub caps filtered searches at 1,000 results.\n\
+          \        query = urllib.parse.urlencode({\"per_page\": 100, \"page\": page})\n\
+          \        runs = get(f\"/repos/{repository}/actions/workflows/{current['workflow_id']}/runs?{query}\"\
+          )\n        for run in runs[\"workflow_runs\"]:\n            if run[\"id\"\
+          ] == run_id:\n                continue\n            if run.get(\"head_branch\"\
+          ) != current[\"head_branch\"] or run.get(\"event\") != event:\n        \
+          \        continue\n            job_page = 1\n            while True:\n \
+          \               jobs = get(\n                    f\"/repos/{repository}/actions/runs/{run['id']}/jobs?per_page=100&page={job_page}\"\
+          \n                )[\"jobs\"]\n                for job in jobs:\n      \
+          \              if (\n                        (\n                       \
+          \     job[\"name\"] in INPUT_CHECK_NAMES\n                            if
+          job_name in INPUT_CHECK_NAMES\n                            else job[\"name\"\
+          ] == job_name\n                        )\n                        and job.get(\"\
+          status\") == \"completed\"\n                        and job.get(\"conclusion\"\
+          ) == \"success\"\n                        and input_identity(job) == identity\n\
+          \                    ):\n                        return False\n        \
+          \        if len(jobs) < 100:\n                    break\n              \
+          \  job_page += 1\n        if len(runs[\"workflow_runs\"]) < 100:\n     \
+          \       return True\n        page += 1\n\n\ndef main():\n    event = os.environ[\"\
+          AB_EVENT\"]\n    event_payload = None\n    if event not in {\"schedule\"\
+          , \"workflow_run\"}:\n        with open(os.environ[\"GITHUB_EVENT_PATH\"\
+          ], encoding=\"utf-8\") as payload_file:\n            event_payload = json.load(payload_file)\n\
+          \    inputs = {\n        \"source_commit\": os.environ[\"AB_HEAD_SHA\"],\n\
+          \        \"source_ref\": os.environ[\"AB_REF\"],\n        \"workflow_definition\"\
+          : os.environ[\"AB_WORKFLOW_DIGEST\"],\n        \"event\": event,\n     \
+          \   \"event_payload\": event_payload,\n        \"schedule\": os.environ[\"\
+          AB_SCHEDULE\"],\n        \"variables\": json.loads(os.environ[\"AB_VARIABLES\"\
+          ]),\n        \"inputs\": json.loads(os.environ[\"AB_INPUTS\"]),\n      \
+          \  \"runner_image\": [os.environ.get(\"ImageOS\", \"\"), os.environ.get(\"\
+          ImageVersion\", \"\")],\n        \"producer\": json.loads(os.environ.get(\"\
+          AB_WORKFLOW_RUN\", \"null\")),\n    }\n    identity = hashlib.sha256(json.dumps(inputs,
+          sort_keys=True).encode()).hexdigest()\n\n    def get(path):\n        request
+          = urllib.request.Request(\n            \"https://api.github.com\" + path,\n\
+          \            headers={\n                \"Authorization\": \"Bearer \" +
+          os.environ[\"GH_TOKEN\"],\n                \"Accept\": \"application/vnd.github+json\"\
+          ,\n                \"X-GitHub-Api-Version\": \"2026-03-10\",\n         \
+          \   },\n        )\n        with urllib.request.urlopen(request, timeout=60)
+          as response:\n            return json.load(response)\n\n    manual = event
+          == \"workflow_dispatch\" or int(os.environ[\"GITHUB_RUN_ATTEMPT\"]) > 1\n\
+          \    should_run = manual or (\n        (\n            inputs[\"event\"]
+          != \"workflow_run\"\n            or parent_has_work(get, os.environ[\"AB_REPOSITORY\"\
+          ], inputs[\"producer\"])\n        )\n        and changed(\n            get,\n\
+          \            repository=os.environ[\"AB_REPOSITORY\"],\n            run_id=int(os.environ[\"\
+          AB_RUN_ID\"]),\n            identity=identity,\n            job_name=\"\
+          CI input check\",\n        )\n    )\n    with open(os.environ[\"GITHUB_OUTPUT\"\
+          ], \"a\", encoding=\"utf-8\") as output:\n        output.write(f\"digest={identity}\\\
+          nchanged={str(should_run).lower()}\\n\")\n    print(\n        \"Explicit
+          CI run requested\"\n        if manual\n        else \"CI inputs changed\"\
+          \n        if should_run\n        else \"CI inputs unchanged; build and test
+          jobs skipped\"\n    )\n\n\nif __name__ == \"__main__\":\n    main()\n\n\
+          ALPHA_BRIDGE_CI_PY\n"
+      - name: CI input identity ${{ steps.identity.outputs.digest }}
+        run: echo 'Input identity recorded'
