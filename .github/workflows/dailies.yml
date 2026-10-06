@@ -36,7 +36,7 @@ jobs:
     needs:
       - load_python_and_os_versions
       - alpha_bridge_inputs
-    uses: ./.github/workflows/testing.yml
+    uses: ./.github/workflows/crucible-call-testing.yml
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -75,7 +75,7 @@ jobs:
 
 
   run-daily-formatwise-installation-testing:
-    uses: ./.github/workflows/formatwise-installation-testing.yml
+    uses: ./.github/workflows/crucible-call-formatwise-installation-testing.yml
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -115,9 +115,10 @@ jobs:
       actions: read
       contents: read
     concurrency:
-      group: alpha-bridge-inputs-${{ github.workflow }}-${{ github.sha }}-${{ 
-        github.event.schedule || github.event_name }}
+      group: alpha-bridge-inputs-da789ae2925ad632-${{ github.workflow }}-${{ 
+        github.sha }}-${{ github.event.schedule || github.event_name }}
       cancel-in-progress: false
+      queue: max
     outputs:
       changed: ${{ steps.identity.outputs.changed }}
     steps:
@@ -133,7 +134,7 @@ jobs:
           AB_REF: ${{ (github.event_name == 'schedule' || github.event_name == 
             'workflow_run') && 'refs/heads/main' || github.ref }}
           AB_WORKFLOW_DIGEST: 
-            2b43a1286d84d891be999126323cbd17da2c25f17d6da5651f28f2b5e2406598
+            3ecf7a56a2e83af0aa0e23b3ab10e2cde4a4195f3442eaf0507675c523c717df
           AB_EVENT: ${{ github.event_name }}
           AB_SCHEDULE: ${{ github.event.schedule || '' }}
           AB_VARIABLES: ${{ toJSON(vars) }}

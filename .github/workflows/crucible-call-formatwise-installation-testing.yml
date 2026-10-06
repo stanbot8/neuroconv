@@ -1,61 +1,251 @@
-name: Rclone AWS Tests
+name: Formatwise gallery tests
 on:
-  schedule:
-    - cron: "0 16 * * 2"  # Weekly at noon on Tuesday
-  workflow_dispatch:
-
-concurrency:  # Cancel previous workflows on the same pull request
-  group: ${{ github.workflow }}-${{ ((github.event_name == 'schedule' || 
-    github.event_name == 'workflow_run') && 'refs/heads/main' || github.ref) }}
-  cancel-in-progress: ${{ (github.event_name == 'workflow_dispatch' || 
-    github.run_attempt > 1) && (true) }}
-
-env:
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  RCLONE_DRIVE_ACCESS_TOKEN: ${{ secrets.RCLONE_DRIVE_ACCESS_TOKEN }}
-  RCLONE_DRIVE_REFRESH_TOKEN: ${{ secrets.RCLONE_DRIVE_REFRESH_TOKEN }}
-  RCLONE_EXPIRY_TOKEN: ${{ secrets.RCLONE_EXPIRY_TOKEN }}
-  DANDI_SANDBOX_API_KEY: ${{ secrets.DANDI_SANDBOX_API_KEY }}
+  workflow_call:
+    inputs:
+      python-versions:
+        description: 'List of Python versions to use in matrix, as JSON string. Defaults
+          to all of them.'
+        required: false
+        type: string
+      os-versions:
+        description: 'List of OS versions to use in matrix, as JSON string. Defaults
+          to all of them.'
+        required: false
+        type: string
+      gallery-pages:
+        description: 'Space separated gallery files to test. Defaults to empty, meaning
+          every registered page.'
+        required: false
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      S3_GIN_BUCKET:
+        required: true
 
 jobs:
-  run:
-    name: ${{ matrix.os }} Python ${{ matrix.python-version }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12"]
-        os: [ubuntu-latest]
+  load_python_and_os_versions:
+    runs-on: ubuntu-latest
+    outputs:
+      ALL_PYTHON_VERSIONS: ${{ 
+        steps.load_python_versions.outputs.python_versions }}
+      ALL_OS_VERSIONS: ${{ steps.load_os_versions.outputs.os_versions }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'schedule' || github.event_name == 
             'workflow_run') && '86978c9c7013694b777e37d9a1ad2b32e7e14c3c' || 
             github.sha }}
-      - run: |-
-          git fetch --prune --unshallow --tags
+      - id: load_python_versions
+        run: |
+          MINIMUM=$(cat ./.github/workflows/min_python_version.txt)
+          MAXIMUM=$(cat ./.github/workflows/max_python_version.txt)
+          echo "python_versions=[\"$MINIMUM\", \"$MAXIMUM\"]" >> "$GITHUB_OUTPUT"
+      - id: load_os_versions
+        run: |-
+          echo "os_versions=$(cat ./.github/workflows/all_os_versions.txt)" >> "$GITHUB_OUTPUT"
+
+
+    needs:
+      - alpha_bridge_inputs
+    if: |-
+      ${{ (success()) && needs.alpha_bridge_inputs.outputs.changed == 'true' }}
+  run:
+    needs:
+      - load_python_and_os_versions
+      - alpha_bridge_inputs
+    name: ${{ matrix.os }} Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The caller may narrow the matrix, as `deploy-tests.yml` does for a draft pull request. The
+        # daily passes nothing and gets every leg.
+        python-version: ${{ fromJson(inputs.python-versions || 
+          needs.load_python_and_os_versions.outputs.ALL_PYTHON_VERSIONS) }}
+        os: ${{ fromJson(inputs.os-versions || 
+          needs.load_python_and_os_versions.outputs.ALL_OS_VERSIONS) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ (github.event_name == 'schedule' || github.event_name == 
+            'workflow_run') && '86978c9c7013694b777e37d9a1ad2b32e7e14c3c' || 
+            github.sha }}
       - name: Setup Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Global Setup
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "latest"
+          enable-cache: false
+
+      - name: Prepare data for tests
+        uses: ./.github/actions/load-data
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          s3-gin-bucket: ${{ secrets.S3_GIN_BUCKET }}
+
+      # Discover formats dynamically from conversion gallery
+      # This automatically finds all .rst files in docs/conversion_examples_gallery/
+      # and creates format strings in the format "category:format_name"
+      # `gallery-pages` is passed through the environment rather than interpolated into the script, so a
+      # branch cannot smuggle shell into the run step by naming a file oddly.
+      - name: Discover formats from gallery
+        id: collect_gallery_formats
+        shell: bash
+        env:
+          GALLERY_PAGES: ${{ inputs.gallery-pages }}
         run: |
-          python -m pip install -U pip  # Official recommended way
-          git config --global user.email "CI@example.com"
-          git config --global user.name "CI Almighty"
+          chmod +x .github/scripts/collect_gallery_formats.py
+          FORMATS_JSON=$(python .github/scripts/collect_gallery_formats.py $GALLERY_PAGES)
+          echo "formats_json=$FORMATS_JSON" >> $GITHUB_OUTPUT
 
-      - name: Install AWS requirements
-        run: |-
-          pip install .[aws,test]
+          # Initialize Job Summary
+          echo "# NeuroConv Format Testing Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform:** ${{ matrix.os }} | **Python:** ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
+          FORMAT_COUNT=$(echo "$FORMATS_JSON" | jq length)
+          echo "**Total Formats Discovered:** $FORMAT_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-      - name: Run RClone on AWS tests
-        run: |-
-          pytest -rsx -n auto tests/remote_transfer_services/yaml_aws_tools_tests.py
-    needs:
-      - alpha_bridge_inputs
+          echo "Discovered $FORMAT_COUNT formats"
+          echo "Formats: $FORMATS_JSON"
+
+      # Run all format tests in sequence
+      - name: Run all format tests in sequence
+        shell: bash
+        run: |
+          # Get formats from discovery step and convert to bash array
+          # Using while loop for macOS compatibility (readarray not available in older bash)
+          FORMATS_JSON='${{ steps.collect_gallery_formats.outputs.formats_json }}'
+          FORMATS=()
+          while IFS= read -r format; do
+            FORMATS+=("$format")
+          done < <(echo "$FORMATS_JSON" | jq -r '.[]')
+
+          echo "Testing ${#FORMATS[@]} formats:"
+          printf '%s\n' "${FORMATS[@]}"
+          echo ""
+
+          # Initialize table in Job Summary
+          echo "## Test Progress" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Format | Category | Status | Reason |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Track overall success
+          OVERALL_SUCCESS=true
+          FAILED_FORMATS=()
+
+          # Loop through each format
+          for format in "${FORMATS[@]}"; do
+            # Split type, name and the installation extra, and trim any whitespace/carriage returns.
+            # The extra is stated by the collection script rather than assumed to equal the page name.
+            IFS=':' read -r type name extra <<< "$format"
+            # Remove any trailing whitespace or carriage returns (Windows compatibility)
+            type=$(echo "$type" | tr -d '\r\n' | xargs)
+            name=$(echo "$name" | tr -d '\r\n' | xargs)
+            extra=$(echo "$extra" | tr -d '\r\n' | xargs)
+
+            echo "===================================================="
+            echo "Testing $type:$name (installing neuroconv[$extra])"
+            echo "===================================================="
+
+            # Create fresh virtual environment with uv (much faster)
+            uv venv clean_env_$name
+
+            # Activate environment
+            if [ "${{ runner.os }}" == "Windows" ]; then
+              source clean_env_$name/Scripts/activate
+            else
+              source clean_env_$name/bin/activate
+            fi
+
+            # Install dependencies with uv (much faster than pip). An empty extra means the page converts
+            # on a base install, which the gallery's extras_by_gallery_entry.json states explicitly.
+            if [ -n "$extra" ]; then
+              uv pip install --quiet ".[$extra]"
+            else
+              uv pip install --quiet "."
+            fi
+            uv pip install --group test
+
+            # Check if the gallery file exists before running pytest
+            gallery_file="docs/conversion_examples_gallery/$type/$name.rst"
+            if [ ! -f "$gallery_file" ]; then
+              echo "Gallery file not found: $gallery_file"
+              OVERALL_SUCCESS=false
+              FAILED_FORMATS+=("$type:$name (file not found)")
+              # Update Job Summary
+              echo "| $name | $type | Failed | File not found |" >> $GITHUB_STEP_SUMMARY
+            else
+              # Run test
+              if pytest --numprocesses=0 --doctest-glob="*.rst" "$gallery_file"; then
+                echo "$type:$name test passed"
+                # Update Job Summary
+                echo "| $name | $type | Passed | All doctests successful |" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "$type:$name test failed"
+                OVERALL_SUCCESS=false
+                FAILED_FORMATS+=("$type:$name")
+                # Update Job Summary
+                echo "| $name | $type | Failed | Doctest failures |" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+
+            # Deactivate environment
+            deactivate
+
+            # Remove environment to save space
+            rm -rf clean_env_$name
+
+            echo ""
+          done
+
+          # Count results for summary
+          TOTAL_FORMATS=${#FORMATS[@]}
+          FAILED_COUNT=${#FAILED_FORMATS[@]}
+          PASSED_COUNT=$((TOTAL_FORMATS - FAILED_COUNT))
+
+          # Add final summary to Job Summary
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Final Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Formats Tested:** $TOTAL_FORMATS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Passed:** $PASSED_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Failed:** $FAILED_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$OVERALL_SUCCESS" = true ]; then
+            echo "**All format tests passed!**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Some format tests failed:**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Failed Formats:" >> $GITHUB_STEP_SUMMARY
+            for failed in "${FAILED_FORMATS[@]}"; do
+              echo "- $failed" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+
+          # Report results to console
+          echo "===================================================="
+          if [ "$OVERALL_SUCCESS" = true ]; then
+            echo "All format tests passed!"
+          else
+            echo "Some format tests failed:"
+            for failed in "${FAILED_FORMATS[@]}"; do
+              echo "   - $failed"
+            done
+            exit 1
+          fi
     if: |-
       ${{ (success()) && needs.alpha_bridge_inputs.outputs.changed == 'true' }}
   alpha_bridge_inputs:
@@ -65,7 +255,7 @@ jobs:
       actions: read
       contents: read
     concurrency:
-      group: alpha-bridge-inputs-a2b0af8b034ab0da-${{ github.workflow }}-${{ 
+      group: alpha-bridge-inputs-beb2fd42797d9acf-${{ github.workflow }}-${{ 
         github.sha }}-${{ github.event.schedule || github.event_name }}
       cancel-in-progress: false
       queue: max
@@ -84,7 +274,7 @@ jobs:
           AB_REF: ${{ (github.event_name == 'schedule' || github.event_name == 
             'workflow_run') && 'refs/heads/main' || github.ref }}
           AB_WORKFLOW_DIGEST: 
-            d7873d50cc9f957cef51eb4a5f2b3ea500d6c2d7ca6ba25e5512b25369073c89
+            5073922f824788030b0a755ead5384cf01fc8efc0c82ee0bc53c036e9ed506cc
           AB_EVENT: ${{ github.event_name }}
           AB_SCHEDULE: ${{ github.event.schedule || '' }}
           AB_VARIABLES: ${{ toJSON(vars) }}

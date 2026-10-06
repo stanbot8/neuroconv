@@ -1,32 +1,32 @@
-name: Rclone AWS Tests
+name: Dev Branch Testing
 on:
-  schedule:
-    - cron: "0 16 * * 2"  # Weekly at noon on Tuesday
-  workflow_dispatch:
-
-concurrency:  # Cancel previous workflows on the same pull request
-  group: ${{ github.workflow }}-${{ ((github.event_name == 'schedule' || 
-    github.event_name == 'workflow_run') && 'refs/heads/main' || github.ref) }}
-  cancel-in-progress: ${{ (github.event_name == 'workflow_dispatch' || 
-    github.run_attempt > 1) && (true) }}
+  workflow_call:
+    inputs:
+      python-versions:
+        description: 'List of Python versions to use in matrix, as JSON string'
+        required: true
+        type: string
+    secrets:
+      DANDI_SANDBOX_API_KEY:
+        required: true
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      S3_GIN_BUCKET:
+        required: true
 
 env:
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  RCLONE_DRIVE_ACCESS_TOKEN: ${{ secrets.RCLONE_DRIVE_ACCESS_TOKEN }}
-  RCLONE_DRIVE_REFRESH_TOKEN: ${{ secrets.RCLONE_DRIVE_REFRESH_TOKEN }}
-  RCLONE_EXPIRY_TOKEN: ${{ secrets.RCLONE_EXPIRY_TOKEN }}
   DANDI_SANDBOX_API_KEY: ${{ secrets.DANDI_SANDBOX_API_KEY }}
 
 jobs:
   run:
-    name: ${{ matrix.os }} Python ${{ matrix.python-version }}
-    runs-on: ${{ matrix.os }}
+    name: Ubuntu tests with Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12"]
-        os: [ubuntu-latest]
+        python-version: ${{ fromJson(inputs.python-versions) }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -35,7 +35,7 @@ jobs:
             github.sha }}
       - run: |-
           git fetch --prune --unshallow --tags
-      - name: Setup Python ${{ matrix.python-version }}
+      - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
@@ -46,14 +46,87 @@ jobs:
           git config --global user.email "CI@example.com"
           git config --global user.name "CI Almighty"
 
-      - name: Install AWS requirements
+      - name: Install Wine (For Plexon2 Tests)
+        uses: ./.github/actions/install-wine
+        with:
+          os: ${{ runner.os }}
+      # Neo downloads the Plexon reader DLL into the home directory the first time a .pl2 file is
+      # opened, with a bare urlopen that has no timeout. Caching it keeps the test run off the network.
+      - name: Cache the Plexon2 reader DLL
+        uses: actions/cache@v5
+        with:
+          path: ~/.plexon_dlls_for_neo
+          key: plexon-dlls-${{ runner.os }}
+
+      - name: Install full requirements
+        run: |
+          pip install --no-cache-dir .[full]
+          pip install --group test --group sorting_analyzer
+
+      # --force-reinstall --no-deps on every dev install: pip skips a git install when the
+      # cloned project declares a version it already has (probeinterface main declares the
+      # released 0.3.2), which silently leaves the release in place. --no-deps keeps each
+      # step to the one package it names, so a later step cannot pull an earlier dev
+      # install back to its release as a dependency.
+      - name: Dev gallery - ROIExtractors
         run: |-
-          pip install .[aws,test]
+          pip install --no-cache-dir --force-reinstall --no-deps git+https://github.com/CatalystNeuro/roiextractors@main
+      - name: Dev gallery - DANDI
+        if: matrix.python-version != '3.10'  # dandi requires >=3.11
+        run: |-
+          pip install --no-cache-dir --force-reinstall --no-deps git+https://github.com/dandi/dandi-cli@master
+      - name: Dev gallery - PyNWB
+        run: |-
+          pip install --no-cache-dir --force-reinstall --no-deps git+https://github.com/NeurodataWithoutBorders/pynwb@dev
+      - name: Dev gallery - ProbeInterface
+        run: |-
+          pip install --no-cache-dir --force-reinstall --no-deps git+https://github.com/spikeinterface/probeinterface@main
+      - name: Dev gallery - SpikeInterface
+        run: |-
+          pip install --no-cache-dir --force-reinstall --no-deps git+https://github.com/spikeinterface/spikeinterface@main
+      - name: Dev gallery - NEO
+        run: |-
+          pip install --no-cache-dir --force-reinstall --no-deps git+https://github.com/NeuralEnsemble/python-neo@master
+      - name: Dev gallery - HDMF
+        run: |-
+          pip install --no-cache-dir --force-reinstall --no-deps git+https://github.com/hdmf-dev/hdmf@dev
+      - name: Dev gallery - HDMF-ZARR
+        run: |-
+          pip install --no-cache-dir --force-reinstall --no-deps git+https://github.com/hdmf-dev/hdmf-zarr@dev
 
 
-      - name: Run RClone on AWS tests
+      # The dev installs above pass --no-deps, so a dependency that a dev branch newly declared is never
+      # fetched: roiextractors added lazyslice on 2026-09-03 and every ophys test failed to import for six
+      # days. Install the ones that are absent and leave the version-mismatch lines alone, since installing
+      # eight dev branches over their released dependencies produces those on purpose.
+      - name: Install the dependencies the dev installs skipped
+        run: |
+          missing=$(pip check | sed -n 's/.* requires \([A-Za-z0-9._-]*\), which is not installed\./\1/p' | sort -u)
+          if [ -n "$missing" ]; then
+            echo "Installing dependencies the dev branches added: $missing"
+            pip install --no-cache-dir $missing
+          fi
+          remaining=$(pip check | sed -n 's/.* requires \([A-Za-z0-9._-]*\), which is not installed\./\1/p' | sort -u)
+          if [ -n "$remaining" ]; then
+            echo "Still missing after install: $remaining"
+            exit 1
+          fi
+
+      - name: Display installed packages and their sources
+        run: |
+          pip list
+
+      - name: Prepare data for tests
+        uses: ./.github/actions/load-data
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          s3-gin-bucket: ${{ secrets.S3_GIN_BUCKET }}
+
+
+      - name: Run full pytest
         run: |-
-          pytest -rsx -n auto tests/remote_transfer_services/yaml_aws_tools_tests.py
+          pytest
     needs:
       - alpha_bridge_inputs
     if: |-
@@ -65,7 +138,7 @@ jobs:
       actions: read
       contents: read
     concurrency:
-      group: alpha-bridge-inputs-a2b0af8b034ab0da-${{ github.workflow }}-${{ 
+      group: alpha-bridge-inputs-59130e23239e778d-${{ github.workflow }}-${{ 
         github.sha }}-${{ github.event.schedule || github.event_name }}
       cancel-in-progress: false
       queue: max
@@ -84,7 +157,7 @@ jobs:
           AB_REF: ${{ (github.event_name == 'schedule' || github.event_name == 
             'workflow_run') && 'refs/heads/main' || github.ref }}
           AB_WORKFLOW_DIGEST: 
-            d7873d50cc9f957cef51eb4a5f2b3ea500d6c2d7ca6ba25e5512b25369073c89
+            216ad72ec0251184d667b8cf84c0b2ed14d6d2a6c059d9b4166bab05b05741db
           AB_EVENT: ${{ github.event_name }}
           AB_SCHEDULE: ${{ github.event.schedule || '' }}
           AB_VARIABLES: ${{ toJSON(vars) }}

@@ -1,23 +1,26 @@
-name: Rclone AWS Tests
+name: Minimal and Full Tests
+
 on:
-  schedule:
-    - cron: "0 16 * * 2"  # Weekly at noon on Tuesday
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      python-versions:
+        description: 'List of Python versions to use in matrix, as JSON string'
+        required: true
+        type: string
+      os-versions:
+        description: 'List of OS versions to use in matrix, as JSON string'
+        required: true
+        type: string
 
-concurrency:  # Cancel previous workflows on the same pull request
-  group: ${{ github.workflow }}-${{ ((github.event_name == 'schedule' || 
-    github.event_name == 'workflow_run') && 'refs/heads/main' || github.ref) }}
-  cancel-in-progress: ${{ (github.event_name == 'workflow_dispatch' || 
-    github.run_attempt > 1) && (true) }}
-
-env:
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  RCLONE_DRIVE_ACCESS_TOKEN: ${{ secrets.RCLONE_DRIVE_ACCESS_TOKEN }}
-  RCLONE_DRIVE_REFRESH_TOKEN: ${{ secrets.RCLONE_DRIVE_REFRESH_TOKEN }}
-  RCLONE_EXPIRY_TOKEN: ${{ secrets.RCLONE_EXPIRY_TOKEN }}
-  DANDI_SANDBOX_API_KEY: ${{ secrets.DANDI_SANDBOX_API_KEY }}
-
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      S3_GIN_BUCKET:
+        required: true
+      CODECOV_TOKEN:
+        required: true
 jobs:
   run:
     name: ${{ matrix.os }} Python ${{ matrix.python-version }}
@@ -25,35 +28,192 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12"]
-        os: [ubuntu-latest]
+        python-version: ${{ fromJson(inputs.python-versions) }}
+        os: ${{ fromJson(inputs.os-versions) }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'schedule' || github.event_name == 
             'workflow_run') && '86978c9c7013694b777e37d9a1ad2b32e7e14c3c' || 
             github.sha }}
-      - run: |-
-          git fetch --prune --unshallow --tags
       - name: Setup Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Global Setup
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "latest"
+          # No cross-run cache: the isolated-extras steps below are here to prove each group installs from
+          # scratch, and a wheel served from a cache GitHub restored is not a download that happened today.
+          enable-cache: false
+
+      - name: Install NeuroConv with minimal requirements
+        run: |-
+          uv pip install --system "."
+      - name: Test initial import of all non-lazy dependencies
+        run: |  # This tests that everything can be imported without errors
+          python -c "import neuroconv"
+          python -c "import neuroconv.datainterfaces"
+          python -c "import neuroconv.tools"
+          python -c "import neuroconv.utils"
+          python -c "import neuroconv.converters"
+
+
+      - name: Install NeuroConv with testing requirements
         run: |
-          python -m pip install -U pip  # Official recommended way
-          git config --global user.email "CI@example.com"
-          git config --global user.name "CI Almighty"
+          uv pip install --system "."
+          uv pip install --system --group test
+      - name: Run import tests
+        run: |
+          pytest --numprocesses=0 tests/imports.py::TestImportStructure::test_top_level
+          pytest --numprocesses=0 tests/imports.py::TestImportStructure::test_tools
+          pytest --numprocesses=0 tests/imports.py::TestImportStructure::test_datainterfaces
+          pytest --numprocesses=0 tests/imports.py::test_datainterfaces_import
 
-      - name: Install AWS requirements
+      - name: Run minimal tests
         run: |-
-          pip install .[aws,test]
+          pytest tests/test_minimal -vv
 
 
-      - name: Run RClone on AWS tests
+      - name: Test ecephys machinery
+        shell: bash
+        run: |
+          # Create ecephys environment
+          uv venv env_ecephys
+          # Activate ecephys environment and install requirements
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            . env_ecephys/Scripts/activate
+          else
+            source env_ecephys/bin/activate
+          fi
+          uv pip install ".[ecephys_minimal]"
+          uv pip install --group test --group sorting_analyzer # we test the sorting analyzer here so we need its dependencies
+          python -m pytest tests/test_modalities/test_ecephys -vv
+          deactivate
+
+      - name: Test ophys machinery
+        shell: bash
+        run: |
+          # Create ophys environment
+          uv venv env_ophys
+          # Activate ophys environment and install requirements
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            . env_ophys/Scripts/activate
+          else
+            source env_ophys/bin/activate
+          fi
+          uv pip install ".[ophys_minimal]"
+          uv pip install --group test
+          python -m pytest tests/test_modalities/test_ophys -vv
+          deactivate
+
+      - name: Test fiber photometry machinery
+        shell: bash
+        run: |
+          # Create fiber_photometry environment
+          uv venv env_fiber_photometry
+          # Activate fiber_photometry environment and install requirements
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            . env_fiber_photometry/Scripts/activate
+          else
+            source env_fiber_photometry/bin/activate
+          fi
+          uv pip install ".[fiber_photometry_minimal]"
+          uv pip install --group test
+          python -m pytest tests/test_modalities/test_fiber_photometry -vv
+          deactivate
+
+      - name: Test guppy machinery
+        shell: bash
+        run: |
+          # Create guppy environment
+          uv venv env_guppy
+          # Activate guppy environment and install requirements
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            . env_guppy/Scripts/activate
+          else
+            source env_guppy/bin/activate
+          fi
+          uv pip install ".[guppy]"
+          uv pip install --group test
+          python -m pytest tests/test_modalities/test_guppy -vv
+          deactivate
+
+      - name: Test behavior machinery
+        shell: bash
+        run: |
+          # Create behavior environment
+          uv venv env_behavior
+          # Activate behavior environment and install requirements
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            . env_behavior/Scripts/activate
+          else
+            source env_behavior/bin/activate
+          fi
+          uv pip install ".[behavior]"
+          uv pip install --group test
+          python -m pytest tests/test_modalities/test_behavior -vv
+          deactivate
+
+      - name: Test events machinery
+        shell: bash
+        run: |
+          # Create events environment
+          uv venv env_events
+          # Activate events environment and install requirements
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            . env_events/Scripts/activate
+          else
+            source env_events/bin/activate
+          fi
+          uv pip install ".[events]"
+          uv pip install --group test
+          python -m pytest tests/test_modalities/test_events -vv
+          deactivate
+
+      - name: Prepare data for tests
+        uses: ./.github/actions/load-data
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          s3-gin-bucket: ${{ secrets.S3_GIN_BUCKET }}
+
+      - name: Install full requirements in base environment
+        run: |
+          uv pip install --system ".[full]"
+          uv pip install --system --group sorting_analyzer
+
+      - name: Install Wine (For Plexon2 Data Tests)
+        uses: ./.github/actions/install-wine
+        with:
+          os: ${{ runner.os }}
+
+      # Neo downloads the Plexon reader DLL into the home directory the first time a .pl2 file is
+      # opened, with a bare urlopen that has no timeout. Caching it keeps the test run off the network.
+      - name: Cache the Plexon2 reader DLL
+        uses: actions/cache@v5
+        with:
+          path: ~/.plexon_dlls_for_neo
+          key: plexon-dlls-${{ runner.os }}
+
+      - name: Run full pytest
+        # Ternary operator: only the job that uploads to Codecov below pays for coverage instrumentation
         run: |-
-          pytest -rsx -n auto tests/remote_transfer_services/yaml_aws_tools_tests.py
+          pytest -vv ${{ (matrix.python-version == '3.10' && matrix.os == 'ubuntu-latest') && '--cov=neuroconv --cov-report xml:./codecov.xml' || '' }}
+      - name: Upload full coverage to Codecov
+        if: ${{ matrix.python-version == '3.10' && matrix.os == 'ubuntu-latest' 
+          }}
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./codecov.xml
+          flags: unittests
+          name: codecov-umbrella
+          codecov_yml_path: ./codecov.yml
+          fail_ci_if_error: true
+          verbose: true
     needs:
       - alpha_bridge_inputs
     if: |-
@@ -65,7 +225,7 @@ jobs:
       actions: read
       contents: read
     concurrency:
-      group: alpha-bridge-inputs-a2b0af8b034ab0da-${{ github.workflow }}-${{ 
+      group: alpha-bridge-inputs-47ae1b3e9647de38-${{ github.workflow }}-${{ 
         github.sha }}-${{ github.event.schedule || github.event_name }}
       cancel-in-progress: false
       queue: max
@@ -84,7 +244,7 @@ jobs:
           AB_REF: ${{ (github.event_name == 'schedule' || github.event_name == 
             'workflow_run') && 'refs/heads/main' || github.ref }}
           AB_WORKFLOW_DIGEST: 
-            d7873d50cc9f957cef51eb4a5f2b3ea500d6c2d7ca6ba25e5512b25369073c89
+            445e6798eb4eda376f8c2b9a2ee764aef127e61825af4c8f284fc27418ba55c2
           AB_EVENT: ${{ github.event_name }}
           AB_SCHEDULE: ${{ github.event.schedule || '' }}
           AB_VARIABLES: ${{ toJSON(vars) }}

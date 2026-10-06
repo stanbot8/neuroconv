@@ -5,7 +5,6 @@ on:
     # Synchronize, open and reopened are the default types for pull request
     # We add ready_for_review to trigger the check for changelog and full tests when ready for review is clicked
   merge_group:
-  workflow_call:
   workflow_dispatch:
 
 concurrency:
@@ -50,9 +49,10 @@ jobs:
       actions: read
       contents: read
     concurrency:
-      group: alpha-bridge-inputs-${{ github.workflow }}-${{ github.sha }}-${{ 
-        github.event.schedule || github.event_name }}
+      group: alpha-bridge-inputs-3607c82baad6272d-${{ github.workflow }}-${{ 
+        github.sha }}-${{ github.event.schedule || github.event_name }}
       cancel-in-progress: false
+      queue: max
     outputs:
       changed: ${{ steps.identity.outputs.changed }}
     steps:
@@ -68,7 +68,7 @@ jobs:
           AB_REF: ${{ (github.event_name == 'schedule' || github.event_name == 
             'workflow_run') && 'refs/heads/main' || github.ref }}
           AB_WORKFLOW_DIGEST: 
-            8deb1294b7d0d0a6daa507ca20bea61d06c1a3b39233afee23dc3a71ff2127e0
+            9974010a4e2a1a4ff5c8496da98eb5bec9aea92fc1b6f7d444eeb94be70e652a
           AB_EVENT: ${{ github.event_name }}
           AB_SCHEDULE: ${{ github.event.schedule || '' }}
           AB_VARIABLES: ${{ toJSON(vars) }}

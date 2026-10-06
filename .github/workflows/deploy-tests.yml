@@ -87,7 +87,7 @@ jobs:
       - alpha_bridge_inputs
     if: |-
       ${{ (needs.assess-file-changes.outputs.SOURCE_CHANGED == 'true') && needs.alpha_bridge_inputs.outputs.changed == 'true' }}
-    uses: ./.github/workflows/testing.yml
+    uses: ./.github/workflows/crucible-call-testing.yml
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -140,7 +140,7 @@ jobs:
       - alpha_bridge_inputs
     if: |-
       ${{ (needs.assess-file-changes.outputs.SOURCE_CHANGED == 'true') && needs.alpha_bridge_inputs.outputs.changed == 'true' }}
-    uses: ./.github/workflows/live-service-testing.yml
+    uses: ./.github/workflows/crucible-call-live-service-testing.yml
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -172,7 +172,7 @@ jobs:
       - alpha_bridge_inputs
     if: |-
       ${{ (needs.assess-file-changes.outputs.CONVERSION_GALLERY_CHANGED == 'true' || needs.assess-file-changes.outputs.PYPROJECT_DEPENDENCIES_CHANGED == 'true') && needs.alpha_bridge_inputs.outputs.changed == 'true' }}
-    uses: ./.github/workflows/formatwise-installation-testing.yml
+    uses: ./.github/workflows/crucible-call-formatwise-installation-testing.yml
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -222,9 +222,10 @@ jobs:
       actions: read
       contents: read
     concurrency:
-      group: alpha-bridge-inputs-${{ github.workflow }}-${{ github.sha }}-${{ 
-        github.event.schedule || github.event_name }}
+      group: alpha-bridge-inputs-2de69a1132568abc-${{ github.workflow }}-${{ 
+        github.sha }}-${{ github.event.schedule || github.event_name }}
       cancel-in-progress: false
+      queue: max
     outputs:
       changed: ${{ steps.identity.outputs.changed }}
     steps:
@@ -240,7 +241,7 @@ jobs:
           AB_REF: ${{ (github.event_name == 'schedule' || github.event_name == 
             'workflow_run') && 'refs/heads/main' || github.ref }}
           AB_WORKFLOW_DIGEST: 
-            89aed355a54368698812095c6e132607039f5b09f25b7c3ca24c5dee05f4323c
+            b3a6dd3871defe3b2e518579f24474b29b9e3a18a2d13e9a21c67925c9fbcd50
           AB_EVENT: ${{ github.event_name }}
           AB_SCHEDULE: ${{ github.event.schedule || '' }}
           AB_VARIABLES: ${{ toJSON(vars) }}

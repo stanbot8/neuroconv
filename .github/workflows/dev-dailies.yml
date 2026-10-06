@@ -33,7 +33,8 @@ jobs:
     if: |-
       ${{ (success()) && needs.alpha_bridge_inputs.outputs.changed == 'true' }}
   build-and-upload-docker-image-dev:
-    uses: ./.github/workflows/build_and_upload_docker_image_dev.yml
+    uses: 
+      ./.github/workflows/crucible-call-build_and_upload_docker_image_dev.yml
     secrets:
       DOCKER_UPLOADER_USERNAME: ${{ secrets.DOCKER_UPLOADER_USERNAME }}
       DOCKER_UPLOADER_PASSWORD: ${{ secrets.DOCKER_UPLOADER_PASSWORD }}
@@ -50,7 +51,7 @@ jobs:
     needs:
       - load_python_and_os_versions
       - alpha_bridge_inputs
-    uses: ./.github/workflows/dev-testing.yml
+    uses: ./.github/workflows/crucible-call-dev-testing.yml
     secrets:
       DANDI_SANDBOX_API_KEY: ${{ secrets.DANDI_SANDBOX_API_KEY }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -70,7 +71,7 @@ jobs:
     needs:
       - load_python_and_os_versions
       - alpha_bridge_inputs
-    uses: ./.github/workflows/live-service-testing.yml
+    uses: ./.github/workflows/crucible-call-live-service-testing.yml
     secrets:
       DANDI_SANDBOX_API_KEY: ${{ secrets.DANDI_SANDBOX_API_KEY }}
       EMBER_SANDBOX_API_KEY: ${{ secrets.EMBER_SANDBOX_API_KEY }}
@@ -90,7 +91,7 @@ jobs:
     if: |-
       ${{ (success()) && needs.alpha_bridge_inputs.outputs.changed == 'true' }}
   run-daily-doc-link-checks:
-    uses: ./.github/workflows/test-external-links.yml
+    uses: ./.github/workflows/crucible-call-test-external-links.yml
 
     permissions:
       contents: read
@@ -185,9 +186,10 @@ jobs:
       actions: read
       contents: read
     concurrency:
-      group: alpha-bridge-inputs-${{ github.workflow }}-${{ github.sha }}-${{ 
-        github.event.schedule || github.event_name }}
+      group: alpha-bridge-inputs-fffee5acd9d3eea3-${{ github.workflow }}-${{ 
+        github.sha }}-${{ github.event.schedule || github.event_name }}
       cancel-in-progress: false
+      queue: max
     outputs:
       changed: ${{ steps.identity.outputs.changed }}
     steps:
@@ -203,7 +205,7 @@ jobs:
           AB_REF: ${{ (github.event_name == 'schedule' || github.event_name == 
             'workflow_run') && 'refs/heads/main' || github.ref }}
           AB_WORKFLOW_DIGEST: 
-            fd668d41fb05255415dc9f5401aed4b8ddc058aa09021e2765b6df1373de8925
+            705e3033bf3219ca50f102f04c4089215a6238af7c84fd2ce40447da18ee285c
           AB_EVENT: ${{ github.event_name }}
           AB_SCHEDULE: ${{ github.event.schedule || '' }}
           AB_VARIABLES: ${{ toJSON(vars) }}

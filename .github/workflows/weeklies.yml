@@ -8,7 +8,7 @@ on:
 jobs:
   build-and-upload-docker-image-rclone-with-config:
     uses: 
-      ./.github/workflows/build_and_upload_docker_image_rclone_with_config.yml
+      ./.github/workflows/crucible-call-build_and_upload_docker_image_rclone_with_config.yml
     secrets:
       DOCKER_UPLOADER_USERNAME: ${{ secrets.DOCKER_UPLOADER_USERNAME }}
       DOCKER_UPLOADER_PASSWORD: ${{ secrets.DOCKER_UPLOADER_PASSWORD }}
@@ -45,7 +45,7 @@ jobs:
     needs:                                                     # Test the image this run just pushed
       - build-and-upload-docker-image-rclone-with-config
       - alpha_bridge_inputs
-    uses: ./.github/workflows/rclone_docker_testing.yml
+    uses: ./.github/workflows/crucible-call-rclone_docker_testing.yml
     secrets:
       RCLONE_DRIVE_ACCESS_TOKEN: ${{ secrets.RCLONE_DRIVE_ACCESS_TOKEN }}
       RCLONE_DRIVE_REFRESH_TOKEN: ${{ secrets.RCLONE_DRIVE_REFRESH_TOKEN }}
@@ -78,7 +78,7 @@ jobs:
             at https://github.com/catalystneuro/neuroconv/actions/workflows/weeklies.yml"
 
   run-weekly-neuroconv-docker-testing:
-    uses: ./.github/workflows/neuroconv_docker_testing.yml
+    uses: ./.github/workflows/crucible-call-neuroconv_docker_testing.yml
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -118,9 +118,10 @@ jobs:
       actions: read
       contents: read
     concurrency:
-      group: alpha-bridge-inputs-${{ github.workflow }}-${{ github.sha }}-${{ 
-        github.event.schedule || github.event_name }}
+      group: alpha-bridge-inputs-12575bd2336fcac6-${{ github.workflow }}-${{ 
+        github.sha }}-${{ github.event.schedule || github.event_name }}
       cancel-in-progress: false
+      queue: max
     outputs:
       changed: ${{ steps.identity.outputs.changed }}
     steps:
@@ -136,7 +137,7 @@ jobs:
           AB_REF: ${{ (github.event_name == 'schedule' || github.event_name == 
             'workflow_run') && 'refs/heads/main' || github.ref }}
           AB_WORKFLOW_DIGEST: 
-            9eb4aaa3bab8622e90e076bddce2cbd154b750df2fa75dea13d37ba63a207869
+            a8ca44189e34420d13a39878ee1b33a93555c6cf04790a5cfe37c41f61529fb4
           AB_EVENT: ${{ github.event_name }}
           AB_SCHEDULE: ${{ github.event.schedule || '' }}
           AB_VARIABLES: ${{ toJSON(vars) }}
